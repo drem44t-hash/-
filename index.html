@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برج الشبكة - اختراق التشفير</title>
+    <style>
+        :root {
+            --neon-green: #00ffcc;
+            --dark-bg: #0b0c10;
+            --panel-bg: #1f2833;
+            --danger: #ff3366;
+        }
+        body {
+            background-color: var(--dark-bg);
+            color: var(--neon-green);
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: var(--panel-bg);
+            padding: 30px;
+            border: 2px solid var(--neon-green);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+        }
+        .hidden { display: none; }
+        
+        /* شاشة الدخول والأوجه */
+        .avatar-container { margin: 20px 0; }
+        .avatar {
+            font-size: 40px;
+            cursor: pointer;
+            padding: 10px;
+            border: 2px solid transparent;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+        .avatar:hover { transform: scale(1.1); }
+        .avatar.selected {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+        
+        /* المدخلات والأزرار */
+        input {
+            background: var(--dark-bg);
+            color: white;
+            border: 1px solid var(--neon-green);
+            padding: 12px;
+            border-radius: 5px;
+            width: 80%;
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        input:focus { outline: none; box-shadow: 0 0 10px var(--neon-green); }
+        
+        button {
+            background: var(--neon-green);
+            color: var(--dark-bg);
+            border: none;
+            padding: 12px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 5px;
+        }
+        button:hover { background: white; box-shadow: 0 0 15px white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: white; color: var(--danger); box-shadow: 0 0 15px var(--danger); }
+        
+        /* عناصر اللعبة */
+        .word-display {
+            font-size: 35px;
+            letter-spacing: 10px;
+            margin: 30px 0;
+            color: white;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--neon-green);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .message { margin: 15px 0; font-size: 18px; font-weight: bold; min-height: 25px; }
+    </style>
+</head>
+<body>
+
+    <!-- شاشة تسجيل الدخول -->
+    <div id="login-screen" class="container">
+        <h1>🔐 نظام أمان برج الشبكة</h1>
+        <p>اختر الوجه الرمزي الخاص بك لتسجيل الدخول:</p>
+        
+        <div class="avatar-container">
+            <span class="avatar" onclick="selectAvatar(this, '🕵️‍♂️')">🕵️‍♂️</span>
+            <span class="avatar" onclick="selectAvatar(this, '👨‍💻')">👨‍💻</span>
+            <span class="avatar" onclick="selectAvatar(this, '🤖')">🤖</span>
+            <span class="avatar" onclick="selectAvatar(this, '👽')">👽</span>
+            <span class="avatar" onclick="selectAvatar(this, '🦁')">🦁</span>
+        </div>
+
+        <input type="text" id="username" placeholder="أدخل اسم المستخدم...">
+        <button onclick="login()">تسجيل الدخول واختراق الشبكة</button>
+        <div id="login-error" class="message" style="color: var(--danger);"></div>
+    </div>
+
+    <!-- شاشة اللعبة -->
+    <div id="game-screen" class="container hidden">
+        <div class="stats">
+            <span id="player-info">العميل: --</span>
+            <span>المستوى: <span id="level">1</span></span>
+            <span>النقاط: <span id="score">0</span></span>
+        </div>
+        
+        <h2>قم بفك تشفير الكلمة لتجاوز جدار الحماية</h2>
+        <div class="word-display" id="word-display">_ _ _</div>
+        
+        <input type="text" id="guess-input" placeholder="اكتب الكلمة الصحيحة هنا...">
+        <button onclick="checkGuess()">تحقق من الرمز</button>
+        
+        <div id="game-message" class="message"></div>
+
+        <hr style="border-color: var(--neon-green); margin: 30px 0;">
+        <button class="btn-danger" onclick="resetSystem()">⚠️ إعادة ضبط المصنع (حذف البيانات)</button>
+    </div>
+
+    <script>
+        // قاعدة بيانات الكلمات مقسمة حسب المستويات
+        const wordsDatabase = {
+            1: ["قمر", "شمس", "بحر", "ليل", "نجم", "وقت", "فجر"],
+            2: ["جدار", "شبكة", "نظام", "رموز", "مفتاح", "تشفير"],
+            3: ["حاسوب", "برمجة", "حماية", "اختراق", "معالج", "تطبيق"],
+            4: ["خوارزمية", "ديناميكي", "معلومات", "تكنولوجيا", "الكتروني"]
+        };
+
+        // المتغيرات الأساسية
+        let currentUser = "";
+        let currentAvatar = "";
+        let currentLevel = 1;
+        let score = 0;
+        let currentWord = "";
+        let scrambledWord = "";
+
+        // التحقق من وجود بيانات سابقة عند فتح الصفحة
+        window.onload = function() {
+            if (localStorage.getItem("networkGame_user")) {
+                currentUser = localStorage.getItem("networkGame_user");
+                currentAvatar = localStorage.getItem("networkGame_avatar");
+                currentLevel = parseInt(localStorage.getItem("networkGame_level")) || 1;
+                score = parseInt(localStorage.getItem("networkGame_score")) || 0;
+                showGameScreen();
+            }
+        };
+
+        // اختيار الوجه الرمزي
+        function selectAvatar(element, avatar) {
+            document.querySelectorAll('.avatar').forEach(a => a.classList.remove('selected'));
+            element.classList.add('selected');
+            currentAvatar = avatar;
+        }
+
+        // نظام تسجيل الدخول
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const errorMsg = document.getElementById('login-error');
+            
+            if (username === "" || currentAvatar === "") {
+                errorMsg.innerText = "خطأ: يجب إدخال الاسم واختيار الوجه الرمزي!";
+                return;
+            }
+
+            currentUser = username;
+            localStorage.setItem("networkGame_user", currentUser);
+            localStorage.setItem("networkGame_avatar", currentAvatar);
+            localStorage.setItem("networkGame_level", currentLevel);
+            localStorage.setItem("networkGame_score", score);
+            
+            showGameScreen();
+        }
+
+        // إظهار شاشة اللعبة وبدء اللعب
+        function showGameScreen() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('player-info').innerText = `العميل: ${currentAvatar} ${currentUser}`;
+            updateStats();
+            startNewRound();
+        }
+
+        // بدء جولة جديدة وتشفير الكلمة (لخبطة الحروف)
+        function startNewRound() {
+            let availableWords = wordsDatabase[currentLevel];
+            if (!availableWords) {
+                // الفوز باللعبة إذا ختم كل المستويات
+                document.getElementById('word-display').innerText = "تم اختراق البرج بالكامل! 🏆";
+                document.getElementById('guess-input').style.display = "none";
+                return;
+            }
+            
+            currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+            scrambledWord = currentWord.split('').sort(() => 0.5 - Math.random()).join('');
+            
+            // التأكد أن الكلمة الملخبطة لا تشبه الأصلية تماماً
+            while (scrambledWord === currentWord && currentWord.length > 1) {
+                scrambledWord = currentWord.split('').sort(() => 0.5 - Math.random()).join('');
+            }
+
+            document.getElementById('word-display').innerText = scrambledWord;
+            document.getElementById('guess-input').value = "";
+            document.getElementById('game-message').innerText = "";
+        }
+
+        // التحقق من التخمين
+        function checkGuess() {
+            const guess = document.getElementById('guess-input').value.trim();
+            const msgElement = document.getElementById('game-message');
+
+            if (guess === currentWord) {
+                score += 10;
+                msgElement.style.color = "var(--neon-green)";
+                msgElement.innerText = "تم فك التشفير بنجاح! +10 نقاط";
+                
+                // الترقية للمستوى التالي كل 30 نقطة
+                if (score % 30 === 0 && score > 0) {
+                    currentLevel++;
+                }
+
+                saveProgress();
+                updateStats();
+                setTimeout(startNewRound, 1500);
+            } else {
+                msgElement.style.color = "var(--danger)";
+                msgElement.innerText = "فشل الاختراق، حاول مرة أخرى!";
+            }
+        }
+
+        // تحديث البيانات على الشاشة
+        function updateStats() {
+            document.getElementById('level').innerText = currentLevel;
+            document.getElementById('score').innerText = score;
+        }
+
+        // حفظ التقدم
+        function saveProgress() {
+            localStorage.setItem("networkGame_level", currentLevel);
+            localStorage.setItem("networkGame_score", score);
+        }
+
+        // إعادة تشغيل النظام بالكامل (حذف البيانات)
+        function resetSystem() {
+            if (confirm("تحذير: هل أنت متأكد أنك تريد مسح جميع البيانات والبدء من الصفر؟")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>برج الشبكة - اختراق التشفير</title>
+    <style>
+        :root {
+            --neon-green: #00ffcc;
+            --dark-bg: #0b0c10;
+            --panel-bg: #1f2833;
+            --danger: #ff3366;
+        }
+        body {
+            background-color: var(--dark-bg);
+            color: var(--neon-green);
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: var(--panel-bg);
+            padding: 30px;
+            border: 2px solid var(--neon-green);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+        }
+        .hidden { display: none; }
+        
+        /* شاشة الدخول والأوجه */
+        .avatar-container { margin: 20px 0; }
+        .avatar {
+            font-size: 40px;
+            cursor: pointer;
+            padding: 10px;
+            border: 2px solid transparent;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+        .avatar:hover { transform: scale(1.1); }
+        .avatar.selected {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+        
+        /* المدخلات والأزرار */
+        input {
+            background: var(--dark-bg);
+            color: white;
+            border: 1px solid var(--neon-green);
+            padding: 12px;
+            border-radius: 5px;
+            width: 80%;
+            font-size: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        input:focus { outline: none; box-shadow: 0 0 10px var(--neon-green); }
+        
+        button {
+            background: var(--neon-green);
+            color: var(--dark-bg);
+            border: none;
+            padding: 12px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 5px;
+        }
+        button:hover { background: white; box-shadow: 0 0 15px white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: white; color: var(--danger); box-shadow: 0 0 15px var(--danger); }
+        
+        /* عناصر اللعبة */
+        .word-display {
+            font-size: 35px;
+            letter-spacing: 10px;
+            margin: 30px 0;
+            color: white;
+            text-shadow: 0 0 10px var(--neon-green);
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--neon-green);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .message { margin: 15px 0; font-size: 18px; font-weight: bold; min-height: 25px; }
+    </style>
+</head>
+<body>
+
+    <!-- شاشة تسجيل الدخول -->
+    <div id="login-screen" class="container">
+        <h1>🔐 نظام أمان برج الشبكة</h1>
+        <p>اختر الوجه الرمزي الخاص بك لتسجيل الدخول:</p>
+        
+        <div class="avatar-container">
+            <span class="avatar" onclick="selectAvatar(this, '🕵️‍♂️')">🕵️‍♂️</span>
+            <span class="avatar" onclick="selectAvatar(this, '👨‍💻')">👨‍💻</span>
+            <span class="avatar" onclick="selectAvatar(this, '🤖')">🤖</span>
+            <span class="avatar" onclick="selectAvatar(this, '👽')">👽</span>
+            <span class="avatar" onclick="selectAvatar(this, '🦁')">🦁</span>
+        </div>
+
+        <input type="text" id="username" placeholder="أدخل اسم المستخدم...">
+        <button onclick="login()">تسجيل الدخول واختراق الشبكة</button>
+        <div id="login-error" class="message" style="color: var(--danger);"></div>
+    </div>
+
+    <!-- شاشة اللعبة -->
+    <div id="game-screen" class="container hidden">
+        <div class="stats">
+            <span id="player-info">العميل: --</span>
+            <span>المستوى: <span id="level">1</span></span>
+            <span>النقاط: <span id="score">0</span></span>
+        </div>
+        
+        <h2>قم بفك تشفير الكلمة لتجاوز جدار الحماية</h2>
+        <div class="word-display" id="word-display">_ _ _</div>
+        
+        <input type="text" id="guess-input" placeholder="اكتب الكلمة الصحيحة هنا...">
+        <button onclick="checkGuess()">تحقق من الرمز</button>
+        
+        <div id="game-message" class="message"></div>
+
+        <hr style="border-color: var(--neon-green); margin: 30px 0;">
+        <button class="btn-danger" onclick="resetSystem()">⚠️ إعادة ضبط المصنع (حذف البيانات)</button>
+    </div>
+
+    <script>
+        // قاعدة بيانات الكلمات مقسمة حسب المستويات
+        const wordsDatabase = {
+            1: ["قمر", "شمس", "بحر", "ليل", "نجم", "وقت", "فجر"],
+            2: ["جدار", "شبكة", "نظام", "رموز", "مفتاح", "تشفير"],
+            3: ["حاسوب", "برمجة", "حماية", "اختراق", "معالج", "تطبيق"],
+            4: ["خوارزمية", "ديناميكي", "معلومات", "تكنولوجيا", "الكتروني"]
+        };
+
+        // المتغيرات الأساسية
+        let currentUser = "";
+        let currentAvatar = "";
+        let currentLevel = 1;
+        let score = 0;
+        let currentWord = "";
+        let scrambledWord = "";
+
+        // التحقق من وجود بيانات سابقة عند فتح الصفحة
+        window.onload = function() {
+            if (localStorage.getItem("networkGame_user")) {
+                currentUser = localStorage.getItem("networkGame_user");
+                currentAvatar = localStorage.getItem("networkGame_avatar");
+                currentLevel = parseInt(localStorage.getItem("networkGame_level")) || 1;
+                score = parseInt(localStorage.getItem("networkGame_score")) || 0;
+                showGameScreen();
+            }
+        };
+
+        // اختيار الوجه الرمزي
+        function selectAvatar(element, avatar) {
+            document.querySelectorAll('.avatar').forEach(a => a.classList.remove('selected'));
+            element.classList.add('selected');
+            currentAvatar = avatar;
+        }
+
+        // نظام تسجيل الدخول
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const errorMsg = document.getElementById('login-error');
+            
+            if (username === "" || currentAvatar === "") {
+                errorMsg.innerText = "خطأ: يجب إدخال الاسم واختيار الوجه الرمزي!";
+                return;
+            }
+
+            currentUser = username;
+            localStorage.setItem("networkGame_user", currentUser);
+            localStorage.setItem("networkGame_avatar", currentAvatar);
+            localStorage.setItem("networkGame_level", currentLevel);
+            localStorage.setItem("networkGame_score", score);
+            
+            showGameScreen();
+        }
+
+        // إظهار شاشة اللعبة وبدء اللعب
+        function showGameScreen() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('player-info').innerText = `العميل: ${currentAvatar} ${currentUser}`;
+            updateStats();
+            startNewRound();
+        }
+
+        // بدء جولة جديدة وتشفير الكلمة (لخبطة الحروف)
+        function startNewRound() {
+            let availableWords = wordsDatabase[currentLevel];
+            if (!availableWords) {
+                // الفوز باللعبة إذا ختم كل المستويات
+                document.getElementById('word-display').innerText = "تم اختراق البرج بالكامل! 🏆";
+                document.getElementById('guess-input').style.display = "none";
+                return;
+            }
+            
+            currentWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+            scrambledWord = currentWord.split('').sort(() => 0.5 - Math.random()).join('');
+            
+            // التأكد أن الكلمة الملخبطة لا تشبه الأصلية تماماً
+            while (scrambledWord === currentWord && currentWord.length > 1) {
+                scrambledWord = currentWord.split('').sort(() => 0.5 - Math.random()).join('');
+            }
+
+            document.getElementById('word-display').innerText = scrambledWord;
+            document.getElementById('guess-input').value = "";
+            document.getElementById('game-message').innerText = "";
+        }
+
+        // التحقق من التخمين
+        function checkGuess() {
+            const guess = document.getElementById('guess-input').value.trim();
+            const msgElement = document.getElementById('game-message');
+
+            if (guess === currentWord) {
+                score += 10;
+                msgElement.style.color = "var(--neon-green)";
+                msgElement.innerText = "تم فك التشفير بنجاح! +10 نقاط";
+                
+                // الترقية للمستوى التالي كل 30 نقطة
+                if (score % 30 === 0 && score > 0) {
+                    currentLevel++;
+                }
+
+                saveProgress();
+                updateStats();
+                setTimeout(startNewRound, 1500);
+            } else {
+                msgElement.style.color = "var(--danger)";
+                msgElement.innerText = "فشل الاختراق، حاول مرة أخرى!";
+            }
+        }
+
+        // تحديث البيانات على الشاشة
+        function updateStats() {
+            document.getElementById('level').innerText = currentLevel;
+            document.getElementById('score').innerText = score;
+        }
+
+        // حفظ التقدم
+        function saveProgress() {
+            localStorage.setItem("networkGame_level", currentLevel);
+            localStorage.setItem("networkGame_score", score);
+        }
+
+        // إعادة تشغيل النظام بالكامل (حذف البيانات)
+        function resetSystem() {
+            if (confirm("تحذير: هل أنت متأكد أنك تريد مسح جميع البيانات والبدء من الصفر؟")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
